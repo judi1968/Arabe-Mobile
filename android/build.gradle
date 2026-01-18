@@ -1,0 +1,82 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+
+    // ✅ Forcer Kotlin version 1.8.22
+    ext {
+        kotlin_version = "1.8.22"
+    }
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.7.2"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "com.google.gms:google-services:4.4.2"
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// --- CLEAN TASK ---
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+
+// --- FORCE JAVA ET KOTLIN 17 POUR TOUS LES MODULES ---
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                java {
+                    toolchain {
+                        languageVersion = JavaLanguageVersion.of(17)
+                    }
+                }
+                // Optionnel mais recommandé : éviter les conflits META-INF
+                packagingOptions {
+                    exclude "META-INF/*.kotlin_module"
+                }
+            }
+        }
+
+        if (project.plugins.hasPlugin("kotlin")) {
+            project.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                kotlinOptions {
+                    jvmTarget = "17"
+                }
+            }
+        }
+    }
+
+    // --- 🔴 FIX CONFLIT KOTLIN ---
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "org.jetbrains.kotlin") {
+                // Forcer Kotlin 1.8.22 partout
+                details.useVersion "1.8.22"
+                details.because("Évite le conflit kotlin-stdlib 1.6.x vs 1.8.x")
+            }
+        }
+
+        // Exclure les anciens modules kotlin-stdlib-jdk7 / jdk8
+        exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+        exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+    }
+}
