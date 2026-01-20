@@ -34,7 +34,13 @@ const AppLayout: React.FC = () => {
               <IonLabel>Accueil</IonLabel>
             </IonItem>
             <IonItem routerLink="/app/list">
-              <IonLabel>Liste</IonLabel>
+              <IonLabel>Mes signalements</IonLabel>
+            </IonItem>
+            <IonItem routerLink="/app/list">
+              <IonLabel>Tableau recapitulatif</IonLabel>
+            </IonItem>
+            <IonItem routerLink="/app/list">
+              <IonLabel>Deconnexion</IonLabel>
             </IonItem>
           </IonList>
         </IonContent>
