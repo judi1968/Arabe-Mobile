@@ -8,16 +8,43 @@ import {
   IonButton
 } from '@ionic/react';
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Geolocation } from '@capacitor/geolocation';
 import { useEffect, useState } from 'react';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Correction des icônes par défaut Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+// Composant pour forcer Leaflet à recalculer la taille
+const MapAutoResize: React.FC = ({ children }: any) => {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+  }, [map]);
+  return <>{children}</>;
+};
+
+// Composant pour centrer et zoomer la carte sur l’utilisateur
+const RecenterMap: React.FC<{ position: [number, number] }> = ({ position }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(position, 15, { animate: true });
+  }, [position, map]);
+  return null;
+};
 
 const Home: React.FC = () => {
   const [position, setPosition] = useState<[number, number] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Position par défaut si GPS indisponible
-  const defaultPosition: [number, number] = [0, 0]; // centre du monde
+  const defaultPosition: [number, number] = [0, 0]; // fallback si GPS indisponible
 
   const loadLocation = async () => {
     try {
@@ -51,29 +78,35 @@ const Home: React.FC = () => {
   }, []);
 
   return (
-    <IonPage>
+    <IonPage style={{ height: '100%' }}>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Cartes</IonTitle>
+          <IonTitle>Carte</IonTitle>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent>
-        {/* Carte toujours visible */}
+      <IonContent style={{ height: '100%' }}>
+        {/* Carte toujours présente */}
         <MapContainer
           center={position ?? defaultPosition}
           zoom={position ? 15 : 2}
-          style={{ height: '100vh', width: '100%' }}
+          style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
+
           {position && (
-            <Marker position={position}>
-              <Popup>📍 Vous êtes ici</Popup>
-            </Marker>
+            <>
+              <Marker position={position}>
+                <Popup>📍 Vous êtes ici</Popup>
+              </Marker>
+              <RecenterMap position={position} />
+            </>
           )}
+
+          <MapAutoResize />
         </MapContainer>
 
         {/* Overlay pour erreur / chargement */}
