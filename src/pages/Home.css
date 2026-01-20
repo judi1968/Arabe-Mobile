@@ -1,0 +1,32 @@
+/* Corrections CSS importantes pour Leaflet */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px;
+}
+
+.leaflet-control-container {
+  z-index: 100;
+}
+
+.leaflet-tile-container img {
+  width: 256px !important;
+  height: 256px !important;
+}
+
+/* Empêcher le débordement */
+.leaflet-pane {
+  overflow: hidden;
+}
+
+/* Correction pour Ionic */
+ion-content {
+  --overflow: hidden;
+}
+
+/* Assurer que la page prend toute la hauteur */
+ion-page {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
