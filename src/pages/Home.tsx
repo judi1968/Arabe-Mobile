@@ -3,7 +3,8 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
-  IonContent
+  IonContent,
+  IonText
 } from '@ionic/react';
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -13,20 +14,61 @@ import { useEffect, useState } from 'react';
 const Home: React.FC = () => {
 
   const [position, setPosition] = useState<[number, number] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadLocation = async () => {
-      const pos = await Geolocation.getCurrentPosition();
-      setPosition([pos.coords.latitude, pos.coords.longitude]);
+      try {
+        
+        const pos = await Geolocation.getCurrentPosition();
+        setPosition([pos.coords.latitude, pos.coords.longitude]);
+      } catch (err: any) {
+        console.error('Erreur géolocalisation :', err);
+        setError('Impossible de récupérer la position GPS. Veuillez vérifier les permissions ou la connexion.');
+      }
     };
 
     loadLocation();
   }, []);
 
-  if (!position) {
-    return <IonPage><IonContent>Chargement...</IonContent></IonPage>;
+  // Affichage d'erreur si problème
+  if (error) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Carte</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonContent className="ion-padding">
+          <IonText color="danger">
+            <h2>Erreur</h2>
+            <p>{error}</p>
+          </IonText>
+        </IonContent>
+      </IonPage>
+    );
   }
 
+  // Chargement
+  if (!position) {
+    return (
+      <IonPage>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Carte</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonContent className="ion-padding">
+          <p>Chargement de la position...</p>
+        </IonContent>
+      </IonPage>
+    );
+  }
+
+  // Carte affichée
   return (
     <IonPage>
       <IonHeader>
