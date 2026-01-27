@@ -10,7 +10,8 @@ import {
   IonMenuButton,
   IonList,
   IonItem,
-  IonLabel
+  IonLabel,
+  IonIcon
 } from '@ionic/react';
 
 import { Route, Redirect } from 'react-router-dom';
@@ -19,6 +20,7 @@ import List from './List';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 import { useHistory } from 'react-router';
+import { home, power } from 'ionicons/icons';
 
 const AppLayout: React.FC = () => {
   const history = useHistory();
@@ -45,16 +47,12 @@ const AppLayout: React.FC = () => {
         <IonContent>
           <IonList>
             <IonItem routerLink="/app/home">
-              <IonLabel>Accueil</IonLabel>
-            </IonItem>
-            <IonItem routerLink="/app/list">
-              <IonLabel>Mes signalements</IonLabel>
-            </IonItem>
-            <IonItem routerLink="/app/list">
-              <IonLabel>Tableau recapitulatif</IonLabel>
+              <IonIcon icon={home}></IonIcon>
+              <IonLabel style={{'margin-left': '10px'}}>Accueil</IonLabel>
             </IonItem>
             <IonItem button onClick={deconnexion}>
-              <IonLabel>Déconnexion</IonLabel>
+              <IonIcon icon={power}></IonIcon>
+              <IonLabel style={{'margin-left': '10px'}}>Déconnexion</IonLabel>
             </IonItem>
           </IonList>
         </IonContent>
