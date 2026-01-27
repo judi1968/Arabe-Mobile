@@ -16,8 +16,22 @@ import {
 import { Route, Redirect } from 'react-router-dom';
 import Home from './Home';
 import List from './List';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
+import { useHistory } from 'react-router';
 
 const AppLayout: React.FC = () => {
+  const history = useHistory();
+
+
+    const deconnexion = async () => {
+    try {
+    await signOut(auth); 
+    history.replace('/login'); 
+    } catch (e) {
+    console.error('Erreur de déconnexion', e);
+    }
+    };
   return (
     <>
       {/* MENU GLOBAL */}
@@ -39,8 +53,8 @@ const AppLayout: React.FC = () => {
             <IonItem routerLink="/app/list">
               <IonLabel>Tableau recapitulatif</IonLabel>
             </IonItem>
-            <IonItem routerLink="/app/list">
-              <IonLabel>Deconnexion</IonLabel>
+            <IonItem button onClick={deconnexion}>
+              <IonLabel>Déconnexion</IonLabel>
             </IonItem>
           </IonList>
         </IonContent>

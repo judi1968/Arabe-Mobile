@@ -7,14 +7,46 @@ import {
   IonText,
   IonButton,
   IonAlert,
-  IonLoading
+  IonLoading,
+  IonToast,
+  IonFab,
+  IonFabButton,
+  IonIcon,
+  IonSelect,
+  IonSelectOption,
+  IonInput,
+  IonTextarea,
+  IonItem,
+  IonLabel,
+  IonList
 } from '@ionic/react';
+import { refreshOutline, locationOutline, addOutline, logOutOutline, saveOutline } from 'ionicons/icons';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { Geolocation } from '@capacitor/geolocation';
 import { useEffect, useState, useRef } from 'react';
+import { useHistory } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Import Firebase
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  query, 
+  onSnapshot, 
+  deleteDoc, 
+  doc, 
+  serverTimestamp, 
+  orderBy,
+  GeoPoint
+} from 'firebase/firestore';
+import { auth } from '../firebase/firebaseConfig';
+import { signOut } from 'firebase/auth';
+
+// Initialiser Firestore
+const db = getFirestore();
 
 // Correction des icônes Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -24,14 +56,27 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Type pour un point personnalisé
-interface CustomPoint {
+// Type pour un signalement
+interface Signalement {
   id: string;
-  lat: number;
-  lng: number;
-  name: string;
+  titre: string;
   description: string;
-  color?: string;
+  position: { latitude: number; longitude: number };
+  date_creation: any;
+  statut: number; // 1: Nouveau, 2: En cours, 3: Résolu
+  surface_m2: number | null;
+  budget: number | null;
+  avancement: number;
+  entreprise_responsable: string;
+  utilisateur_id: string;
+  userEmail: string;
+  synchronise_firebase: boolean;
+}
+
+// Type pour une entreprise
+interface Entreprise {
+  id: string;
+  nom: string;
 }
 
 // Composant pour détecter les clics sur la carte
@@ -96,18 +141,36 @@ const RecenterMap: React.FC<{ position: [number, number] }> = ({ position }) => 
 const Home: React.FC = () => {
   const [position, setPosition] = useState<[number, number] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showAddPointAlert, setShowAddPointAlert] = useState(false);
+  const [showSignalementForm, setShowSignalementForm] = useState(false);
   const [clickedPoint, setClickedPoint] = useState<{lat: number, lng: number} | null>(null);
-  const [pointName, setPointName] = useState('');
-  const [pointDescription, setPointDescription] = useState('');
-  const [customPoints, setCustomPoints] = useState<CustomPoint[]>([]);
+  const [signalements, setSignalements] = useState<Signalement[]>([]);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [userEmail, setUserEmail] = useState<string>('');
+  
+  // Champs du formulaire de signalement
+  const [formTitre, setFormTitre] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formStatut, setFormStatut] = useState<number>(1);
+  const [formSurface, setFormSurface] = useState<string>('');
+  const [formBudget, setFormBudget] = useState<string>('');
+  const [formAvancement, setFormAvancement] = useState<string>('0');
+  const [formEntreprise, setFormEntreprise] = useState<string>('');
+  
   const mapRef = useRef<any>(null);
+  const history = useHistory();
 
-  const defaultPosition: [number, number] = [48.8566, 2.3522];
+  const defaultPosition: [number, number] = [-18.8792, 47.5079]; // Antananarivo
 
-  // Créer une icône personnalisée pour les points ajoutés
-  const createCustomIcon = (color: string = '#ff4444') => {
+  // Créer une icône personnalisée pour les signalements
+  const createSignalementIcon = (statut: number) => {
+    let color = '#ff4444'; // Rouge par défaut (Nouveau)
+    
+    if (statut === 2) color = '#ffcc00'; // Jaune (En cours)
+    if (statut === 3) color = '#10dc60'; // Vert (Résolu)
+    
     return new L.Icon({
       iconUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
       iconSize: [24, 24],
@@ -115,6 +178,70 @@ const Home: React.FC = () => {
       popupAnchor: [0, -24],
     });
   };
+
+  // Charger les entreprises depuis Firebase
+  useEffect(() => {
+    if (auth.currentUser) {
+      setUserEmail(auth.currentUser.email || '');
+      
+      // Charger les entreprises
+      const entreprisesRef = collection(db, "entreprises");
+      const entreprisesQuery = query(entreprisesRef);
+      
+      const unsubscribeEntreprises = onSnapshot(entreprisesQuery, (snapshot) => {
+        const entreprisesList: Entreprise[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          entreprisesList.push({
+            id: doc.id,
+            nom: data.nom
+          });
+        });
+        setEntreprises(entreprisesList);
+        
+        // Sélectionner la première entreprise par défaut
+        if (entreprisesList.length > 0 && !formEntreprise) {
+          setFormEntreprise(entreprisesList[0].nom);
+        }
+      });
+      
+      // Charger les signalements
+      const signalementsRef = collection(db, "signalements");
+      const signalementsQuery = query(signalementsRef, orderBy("date_creation", "desc"));
+      
+      const unsubscribeSignalements = onSnapshot(signalementsQuery, (snapshot) => {
+        const signalementsList: Signalement[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          signalementsList.push({
+            id: doc.id,
+            titre: data.titre,
+            description: data.description,
+            position: data.position,
+            date_creation: data.date_creation,
+            statut: data.statut,
+            surface_m2: data.surface_m2,
+            budget: data.budget,
+            avancement: data.avancement,
+            entreprise_responsable: data.entreprise_responsable,
+            utilisateur_id: data.utilisateur_id,
+            userEmail: data.userEmail,
+            synchronise_firebase: data.synchronise_firebase
+          });
+        });
+        setSignalements(signalementsList);
+      }, (error) => {
+        console.error("Erreur lors du chargement:", error);
+        setToastMessage("Erreur de chargement des données");
+        setShowToast(true);
+      });
+
+      // Nettoyer les écouteurs
+      return () => {
+        unsubscribeEntreprises();
+      };
+    }
+  }, []);
 
   const loadLocation = async () => {
     setIsLoading(true);
@@ -132,7 +259,7 @@ const Home: React.FC = () => {
       } else {
         const perm = await Geolocation.requestPermissions();
         if (perm.location === 'denied') {
-          setError('Permission GPS refusée. Activez le GPS pour voir votre position.');
+          setError('Permission GPS refusée.');
           setIsLoading(false);
           return;
         }
@@ -145,8 +272,8 @@ const Home: React.FC = () => {
       setPosition([coords.coords.latitude, coords.coords.longitude]);
       setError(null);
     } catch (err: any) {
-      console.error('Erreur géolocalisation :', err);
-      setError('Impossible de récupérer la position GPS. Vérifiez les permissions ou la connexion.');
+      console.error('Erreur géolocalisation:', err);
+      setError('Impossible de récupérer la position GPS.');
       setPosition(defaultPosition);
     } finally {
       setIsLoading(false);
@@ -176,57 +303,145 @@ const Home: React.FC = () => {
   // Gestion du clic sur la carte
   const handleMapClick = (lat: number, lng: number) => {
     setClickedPoint({ lat, lng });
-    setShowAddPointAlert(true);
+    setShowSignalementForm(true);
   };
 
-  // Ajouter un nouveau point
-  const addNewPoint = () => {
-    if (!clickedPoint || !pointName.trim()) return;
+  // Réinitialiser le formulaire
+  const resetForm = () => {
+    setFormTitre('');
+    setFormDescription('');
+    setFormStatut(1);
+    setFormSurface('');
+    setFormBudget('');
+    setFormAvancement('0');
+    if (entreprises.length > 0) {
+      setFormEntreprise(entreprises[0].nom);
+    }
+  };
 
-    const newPoint: CustomPoint = {
-      id: Date.now().toString(),
-      lat: clickedPoint.lat,
-      lng: clickedPoint.lng,
-      name: pointName,
-      description: pointDescription,
-      color: '#3880ff' // Couleur bleue par défaut
-    };
-
-    setCustomPoints(prev => [...prev, newPoint]);
+  // Ajouter un nouveau signalement dans Firebase
+  const ajouterSignalement = async () => {
+    if (!clickedPoint || !formTitre.trim()) {
+      setToastMessage("Le titre est obligatoire");
+      setShowToast(true);
+      return;
+    }
     
-    // Réinitialiser les champs
-    setPointName('');
-    setPointDescription('');
-    setClickedPoint(null);
-    setShowAddPointAlert(false);
+    if (!auth.currentUser) {
+      setToastMessage("Vous devez être connecté");
+      setShowToast(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const user = auth.currentUser;
+      
+      // Préparer les données du signalement
+      const signalementData = {
+        titre: formTitre.trim(),
+        description: formDescription.trim(),
+        position: new GeoPoint(clickedPoint.lat, clickedPoint.lng),
+        date_creation: serverTimestamp(),
+        statut: formStatut,
+        surface_m2: formSurface ? parseFloat(formSurface) : null,
+        budget: formBudget ? parseFloat(formBudget) : null,
+        avancement: parseInt(formAvancement) || 0,
+        entreprise_responsable: formEntreprise,
+        utilisateur_id: user.uid,
+        userEmail: user.email || '',
+        synchronise_firebase: true
+      };
+
+      console.log("Envoi du signalement:", signalementData);
+      
+      // Ajouter le document dans la collection "signalements"
+      const docRef = await addDoc(collection(db, "signalements"), signalementData);
+      
+      console.log("✅ Signalement ajouté avec ID:", docRef.id);
+      
+      // Afficher un message de succès
+      setToastMessage("Signalement enregistré avec succès!");
+      setShowToast(true);
+      
+      // Réinitialiser et fermer
+      resetForm();
+      setClickedPoint(null);
+      setShowSignalementForm(false);
+      
+    } catch (error: any) {
+      console.error("❌ Erreur lors de l'ajout:", error);
+      setToastMessage(`Erreur: ${error.message}`);
+      setShowToast(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Supprimer un point
-  const deletePoint = (id: string) => {
-    setCustomPoints(prev => prev.filter(point => point.id !== id));
+  // Supprimer un signalement
+  const supprimerSignalement = async (id: string) => {
+    if (!auth.currentUser) {
+      setToastMessage("Vous devez être connecté");
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "signalements", id));
+      setToastMessage("Signalement supprimé");
+      setShowToast(true);
+    } catch (error: any) {
+      console.error("Erreur suppression:", error);
+      setToastMessage(`Erreur: ${error.message}`);
+      setShowToast(true);
+    }
+  };
+
+  // Déconnexion
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      history.push('/');
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion:", error);
+    }
+  };
+
+  // Obtenir le texte du statut
+  const getStatutText = (statut: number) => {
+    switch(statut) {
+      case 1: return "Nouveau";
+      case 2: return "En cours";
+      case 3: return "Résolu";
+      default: return "Inconnu";
+    }
+  };
+
+  // Obtenir la couleur du statut
+  const getStatutColor = (statut: number) => {
+    switch(statut) {
+      case 1: return "danger";
+      case 2: return "warning";
+      case 3: return "success";
+      default: return "medium";
+    }
   };
 
   return (
     <IonPage style={{ height: '100vh' }}>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Carte Interactive</IonTitle>
+          <IonTitle>Carte des Signalements - {userEmail}</IonTitle>
+          <IonButton slot="end" onClick={handleLogout} fill="clear">
+            <IonIcon icon={logOutOutline} />
+            Déconnexion
+          </IonButton>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent 
-        fullscreen 
-        style={{ 
-          '--background': 'transparent',
-          height: '100%'
-        }}
-      >
-        <div style={{ 
-          height: '100%', 
-          width: '100%', 
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
+      <IonContent fullscreen style={{ '--background': 'transparent' }}>
+        <div style={{ height: '100%', width: '100%', position: 'relative', overflow: 'hidden' }}>
+          
           {/* Carte */}
           <MapContainer
             ref={mapRef}
@@ -234,16 +449,7 @@ const Home: React.FC = () => {
             zoom={position ? 15 : 12}
             maxZoom={19}
             minZoom={2}
-            style={{ 
-              height: '100%', 
-              width: '100%',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 1
-            }}
+            style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}
             whenReady={() => {
               if (mapRef.current) {
                 setTimeout(() => {
@@ -256,69 +462,70 @@ const Home: React.FC = () => {
             touchZoom={true}
             zoomControl={true}
           >
-            {/* TileLayer */}
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               subdomains={['a', 'b', 'c']}
               crossOrigin="anonymous"
-              maxZoom={19}
-              minZoom={2}
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              updateWhenIdle={true}
-              keepBuffer={2}
+              attribution='&copy; OpenStreetMap'
             />
 
-            {/* Marqueur de position actuelle */}
+            {/* Position actuelle */}
             {position && (
               <>
                 <Marker position={position}>
                   <Popup>
                     <strong>📍 Votre position actuelle</strong><br />
-                    Latitude: {position[0].toFixed(6)}<br />
-                    Longitude: {position[1].toFixed(6)}
+                    Lat: {position[0].toFixed(6)}<br />
+                    Lng: {position[1].toFixed(6)}
                   </Popup>
                 </Marker>
                 <RecenterMap position={position} />
               </>
             )}
 
-            {/* Points personnalisés */}
-            {customPoints.map(point => (
+            {/* Signalements depuis Firebase */}
+            {signalements.map(signalement => (
               <Marker 
-                key={point.id} 
-                position={[point.lat, point.lng]}
-                icon={createCustomIcon(point.color)}
+                key={signalement.id} 
+                position={[signalement.position.latitude, signalement.position.longitude]}
+                icon={createSignalementIcon(signalement.statut)}
               >
                 <Popup>
-                  <div style={{ minWidth: '200px' }}>
-                    <strong>{point.name}</strong><br />
+                  <div style={{ minWidth: '250px' }}>
+                    <strong>{signalement.titre}</strong><br />
                     <small>
-                      Lat: {point.lat.toFixed(6)}<br />
-                      Lng: {point.lng.toFixed(6)}
+                      <IonText color={getStatutColor(signalement.statut)}>
+                        Statut: {getStatutText(signalement.statut)}
+                      </IonText>
+                      <br />
+                      Entreprise: {signalement.entreprise_responsable}<br />
+                      Avancement: {signalement.avancement}%<br />
+                      {signalement.userEmail && `Par: ${signalement.userEmail}`}
                     </small>
-                    {point.description && (
+                    {signalement.description && (
                       <>
-                        <hr style={{ margin: '8px 0' }} />
-                        <p>{point.description}</p>
+                        <hr />
+                        <p style={{ fontSize: '12px' }}>{signalement.description}</p>
                       </>
                     )}
-                    <div style={{ marginTop: '10px' }}>
-                      <IonButton 
-                        size="small" 
-                        color="danger"
-                        onClick={() => deletePoint(point.id)}
-                      >
-                        Supprimer
-                      </IonButton>
-                    </div>
+                    {signalement.budget && (
+                      <p style={{ fontSize: '12px', marginTop: '5px' }}>
+                        <strong>Budget:</strong> {signalement.budget} €
+                      </p>
+                    )}
+                    {auth.currentUser?.uid === signalement.utilisateur_id && (
+                      <div style={{ marginTop: '10px' }}>
+                        <IonButton size="small" color="danger" onClick={() => supprimerSignalement(signalement.id)}>
+                          Supprimer
+                        </IonButton>
+                      </div>
+                    )}
                   </div>
                 </Popup>
               </Marker>
             ))}
 
-            {/* Gestionnaire de clics sur la carte */}
             <MapClickHandler onMapClick={handleMapClick} />
-
             <MapAutoResize children={undefined} />
           </MapContainer>
 
@@ -356,173 +563,192 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          {/* Boutons flottants */}
-          <div
-            style={{
+          {/* Boutons FAB */}
+          <IonFab vertical="top" horizontal="end" slot="fixed" style={{ top: '70px' }}>
+            <IonFabButton size="small" onClick={forceMapResize}>
+              <IonIcon icon={refreshOutline} />
+            </IonFabButton>
+          </IonFab>
+
+          <IonFab vertical="top" horizontal="end" slot="fixed" style={{ top: '130px' }}>
+            <IonFabButton size="small" onClick={() => position && setPosition(position)}>
+              <IonIcon icon={locationOutline} />
+            </IonFabButton>
+          </IonFab>
+
+          <IonFab vertical="bottom" horizontal="end" slot="fixed" style={{ bottom: '20px' }}>
+            <IonFabButton onClick={() => position && handleMapClick(position[0], position[1])}>
+              <IonIcon icon={addOutline} />
+            </IonFabButton>
+          </IonFab>
+
+          {/* Statistiques */}
+          {signalements.length > 0 && (
+            <div style={{
               position: 'absolute',
               top: '70px',
-              right: '20px',
+              left: '10px',
               zIndex: 1000,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}
-          >
-            <IonButton 
-              onClick={forceMapResize}
-              size="small"
-              style={{
-                borderRadius: '50%',
-                width: '44px',
-                height: '44px',
-                '--background': '#3880ff'
-              }}
-              title="Redimensionner la carte"
-            >
-              ↻
-            </IonButton>
-
-            <IonButton 
-              onClick={() => setPosition(position || defaultPosition)}
-              size="small"
-              style={{
-                borderRadius: '50%',
-                width: '44px',
-                height: '44px',
-                '--background': '#10dc60'
-              }}
-              title="Recentrer sur ma position"
-            >
-              📍
-            </IonButton>
-
-            <IonButton 
-              onClick={() => {
-                if (position) {
-                  setClickedPoint({ lat: position[0], lng: position[1] });
-                  setShowAddPointAlert(true);
-                }
-              }}
-              size="small"
-              style={{
-                borderRadius: '50%',
-                width: '44px',
-                height: '44px',
-                '--background': '#ffcc00'
-              }}
-              title="Ajouter un point à ma position"
-              disabled={!position}
-            >
-              ➕
-            </IonButton>
-          </div>
-
-          {/* Panneau des points ajoutés */}
-          {customPoints.length > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '20px',
-                left: '20px',
-                zIndex: 1000,
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '10px',
-                padding: '15px',
-                maxWidth: '300px',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
-              }}
-            >
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>
-                Points ajoutés ({customPoints.length})
-              </h4>
-              {customPoints.map(point => (
-                <div 
-                  key={point.id} 
-                  style={{ 
-                    marginBottom: '8px', 
-                    padding: '8px', 
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '5px',
-                    fontSize: '12px'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold' }}>{point.name}</div>
-                  <div style={{ color: '#666', fontSize: '11px' }}>
-                    {point.lat.toFixed(4)}, {point.lng.toFixed(4)}
-                  </div>
-                </div>
-              ))}
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              padding: '10px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              minWidth: '120px'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>📊 Signalements</div>
+              <div>Total: {signalements.length}</div>
+              <div>Nouveaux: {signalements.filter(s => s.statut === 1).length}</div>
+              <div>En cours: {signalements.filter(s => s.statut === 2).length}</div>
+              <div>Résolus: {signalements.filter(s => s.statut === 3).length}</div>
             </div>
           )}
         </div>
       </IonContent>
 
-      {/* Alert pour ajouter un point */}
-      <IonAlert
-        isOpen={showAddPointAlert}
-        onDidDismiss={() => {
-          setShowAddPointAlert(false);
-          setClickedPoint(null);
-        }}
-        header="Ajouter un point"
-        subHeader={clickedPoint ? 
-          `Latitude: ${clickedPoint.lat.toFixed(6)}\nLongitude: ${clickedPoint.lng.toFixed(6)}` : 
-          ''
-        }
-        message="Renseignez les informations du point"
-        inputs={[
-          {
-            name: 'name',
-            type: 'text',
-            placeholder: 'Nom du point *',
-            value: pointName,
-            handler: (input) => {
-              setPointName(input.value || '');
-            },
-            attributes: {
-              required: true
-            }
-          },
-          {
-            name: 'description',
-            type: 'textarea',
-            placeholder: 'Description (optionnel)',
-            value: pointDescription,
-            handler: (input) => {
-              setPointDescription(input.value || '');
-            }
-          }
-        ]}
-        buttons={[
-          {
-            text: 'Annuler',
-            role: 'cancel',
-            handler: () => {
-              setPointName('');
-              setPointDescription('');
-            }
-          },
-          {
-            text: 'Ajouter',
-            handler: (data) => {
-              if (!data.name.trim()) {
-                alert('Le nom du point est requis');
-                return false;
-              }
-              setPointName(data.name);
-              setPointDescription(data.description || '');
-              setTimeout(addNewPoint, 50);
-              return true;
-            }
-          }
-        ]}
-      />
+      {/* Modal pour ajouter un signalement */}
+      {showSignalementForm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 2000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '10px',
+            padding: '20px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <h2 style={{ marginTop: 0 }}>📋 Nouveau Signalement</h2>
+            
+            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
+              <strong>📍 Position sélectionnée:</strong><br />
+              Latitude: {clickedPoint?.lat.toFixed(6)}<br />
+              Longitude: {clickedPoint?.lng.toFixed(6)}
+            </div>
+            
+            <IonList>
+              <IonItem>
+                <IonLabel position="stacked">Titre *</IonLabel>
+                <IonInput
+                  value={formTitre}
+                  onIonChange={e => setFormTitre(e.detail.value || '')}
+                  placeholder="Ex: Route endommagée"
+                />
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Description</IonLabel>
+                <IonTextarea
+                  value={formDescription}
+                  onIonChange={e => setFormDescription(e.detail.value || '')}
+                  placeholder="Décrivez le problème..."
+                  rows={3}
+                />
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Statut</IonLabel>
+                <IonSelect 
+                  value={formStatut} 
+                  onIonChange={e => setFormStatut(e.detail.value)}
+                >
+                  <IonSelectOption value={1}>Nouveau</IonSelectOption>
+                  <IonSelectOption value={2}>En cours</IonSelectOption>
+                  <IonSelectOption value={3}>Résolu</IonSelectOption>
+                </IonSelect>
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Entreprise responsable</IonLabel>
+                <IonSelect 
+                  value={formEntreprise} 
+                  onIonChange={e => setFormEntreprise(e.detail.value)}
+                >
+                  {entreprises.map(entreprise => (
+                    <IonSelectOption key={entreprise.id} value={entreprise.nom}>
+                      {entreprise.nom}
+                    </IonSelectOption>
+                  ))}
+                </IonSelect>
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Surface (m²)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={formSurface}
+                  onIonChange={e => setFormSurface(e.detail.value || '')}
+                  placeholder="Ex: 5.5"
+                />
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Budget (€)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={formBudget}
+                  onIonChange={e => setFormBudget(e.detail.value || '')}
+                  placeholder="Ex: 1500"
+                />
+              </IonItem>
+              
+              <IonItem>
+                <IonLabel position="stacked">Avancement (%)</IonLabel>
+                <IonInput
+                  type="number"
+                  value={formAvancement}
+                  onIonChange={e => setFormAvancement(e.detail.value || '')}
+                  min="0"
+                  max="100"
+                />
+              </IonItem>
+            </IonList>
+            
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+              <IonButton 
+                expand="block" 
+                color="medium" 
+                onClick={() => {
+                  setShowSignalementForm(false);
+                  resetForm();
+                }}
+              >
+                Annuler
+              </IonButton>
+              
+              <IonButton 
+                expand="block" 
+                color="primary"
+                onClick={ajouterSignalement}
+                disabled={!formTitre.trim()}
+              >
+                <IonIcon icon={saveOutline} slot="start" />
+                Enregistrer
+              </IonButton>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <IonLoading
-        isOpen={isLoading}
-        message={'Chargement de votre position...'}
+      <IonLoading isOpen={isLoading} message="Enregistrement en cours..." />
+      
+      <IonToast
+        isOpen={showToast}
+        onDidDismiss={() => setShowToast(false)}
+        message={toastMessage}
+        duration={3000}
+        position="top"
       />
     </IonPage>
   );
