@@ -25,7 +25,11 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonSegment,
-  IonSegmentButton
+  IonSegmentButton,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonActionSheet
 } from '@ionic/react';
 import { 
   refreshOutline, 
@@ -40,7 +44,12 @@ import {
   calendarOutline,
   cashOutline,
   businessOutline,
-  speedometerOutline
+  speedometerOutline,
+  cameraOutline,
+  imageOutline,
+  closeCircleOutline,
+  trashOutline,
+  eyeOutline
 } from 'ionicons/icons';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
@@ -93,12 +102,20 @@ interface Signalement {
   utilisateur_id: string;
   userEmail: string;
   synchronise_firebase: boolean;
+  photos?: string[]; // Ajout du champ photos (optionnel pour compatibilité)
 }
 
 // Type pour une entreprise
 interface Entreprise {
   id: string;
   nom: string;
+}
+
+// Type pour une photo (nouveau)
+interface Photo {
+  id: string;
+  base64: string;
+  name: string;
 }
 
 // Composant pour détecter les clics sur la carte
@@ -177,6 +194,12 @@ const Home: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
   const [filterType, setFilterType] = useState<'all' | 'mine'>('all'); // 'all' ou 'mine'
   
+  // NOUVEAU: États pour les photos
+  const [selectedPhotos, setSelectedPhotos] = useState<Photo[]>([]);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  
   // Champs du formulaire de signalement
   const [formTitre, setFormTitre] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -188,6 +211,7 @@ const Home: React.FC = () => {
   
   const mapRef = useRef<any>(null);
   const history = useHistory();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const defaultPosition: [number, number] = [-18.8792, 47.5079]; // Antananarivo
 
@@ -272,7 +296,8 @@ const Home: React.FC = () => {
             entreprise_responsable: data.entreprise_responsable,
             utilisateur_id: data.utilisateur_id,
             userEmail: data.userEmail,
-            synchronise_firebase: data.synchronise_firebase
+            synchronise_firebase: data.synchronise_firebase,
+            photos: data.photos || [] // Charger les photos si elles existent
           });
         });
         setSignalements(signalementsList);
@@ -380,7 +405,88 @@ const Home: React.FC = () => {
     setFormSurface('');
     setFormBudget('');
     setFormAvancement('0');
-    setFormEntreprise(null)
+    setFormEntreprise(null);
+    // NOUVEAU: Réinitialiser les photos
+    setSelectedPhotos([]);
+  };
+
+  // NOUVEAU: Prendre une photo avec la caméra (navigateur)
+  const takePhoto = async () => {
+    try {
+      // Créer un input file pour accéder à la caméra
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment'; // Utiliser la caméra arrière si disponible
+      
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const newPhoto: Photo = {
+              id: Date.now().toString(),
+              base64: reader.result as string,
+              name: file.name
+            };
+            setSelectedPhotos(prev => [...prev, newPhoto]);
+          };
+          reader.readAsDataURL(file);
+        }
+        setShowPhotoOptions(false);
+      };
+      
+      input.click();
+    } catch (error) {
+      console.error('Erreur caméra:', error);
+      setToastMessage('Erreur lors de la prise de photo');
+      setShowToast(true);
+    }
+  };
+
+  // NOUVEAU: Sélectionner des photos depuis la galerie
+  const selectFromGallery = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // NOUVEAU: Gérer la sélection de fichiers
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newPhotos: Photo[] = [];
+      
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const newPhoto: Photo = {
+            id: Date.now().toString() + Math.random(),
+            base64: reader.result as string,
+            name: file.name
+          };
+          newPhotos.push(newPhoto);
+          
+          // Quand toutes les photos sont chargées
+          if (newPhotos.length === files.length) {
+            setSelectedPhotos(prev => [...prev, ...newPhotos]);
+            setShowPhotoOptions(false);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // NOUVEAU: Supprimer une photo
+  const removePhoto = (photoId: string) => {
+    setSelectedPhotos(prev => prev.filter(photo => photo.id !== photoId));
+  };
+
+  // NOUVEAU: Afficher une photo en grand
+  const viewPhoto = (index: number) => {
+    setSelectedPhotoIndex(index);
+    setShowPhotoViewer(true);
   };
 
   // Ajouter un nouveau signalement dans Firebase
@@ -401,6 +507,9 @@ const Home: React.FC = () => {
     try {
       const user = auth.currentUser;
       
+      // NOUVEAU: Préparer les photos (extraire les base64)
+      const photoBase64Array = selectedPhotos.map(photo => photo.base64);
+      
       // Préparer les données du signalement
       const signalementData = {
         titre: formTitre.trim(),
@@ -414,7 +523,9 @@ const Home: React.FC = () => {
         entreprise_responsable: formEntreprise,
         utilisateur_id: user.uid,
         userEmail: user.email || '',
-        synchronise_firebase: true
+        synchronise_firebase: true,
+        // NOUVEAU: Ajouter les photos
+        photos: photoBase64Array
       };
 
       console.log("Envoi du signalement:", signalementData);
@@ -514,45 +625,33 @@ const Home: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           {/* Sélecteur de filtre */}
-          {/* <div style={{
-            position: 'absolute',
-            top: '70px',
-            left: '10px',
-            zIndex: 1000,
-            backgroundColor: 'rgba(255,255,255,0.95)',
-            borderRadius: '10px',
-            padding: '10px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            minWidth: '180px'
-          }}> */}
-            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <IonIcon icon={filterOutline} />
-              Filtre des signalements
-            </div>
-            
-            <IonSegment value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
-              <IonSegmentButton value="all" style={{ '--color-checked': '#3880ff' }}>
-                <IonIcon icon={peopleOutline} />
-                <IonLabel>Tous</IonLabel>
-              </IonSegmentButton>
-              <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
-                <IonIcon icon={personOutline} />
-                <IonLabel>Mes signalements</IonLabel>
-              </IonSegmentButton>
-            </IonSegment>
-            
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-              <div>Total: {filteredSignalements.length} signalement(s)</div>
-              <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
-              <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
-              <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
-              {filterType === 'mine' && (
-                <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
-                  <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
-                </div>
-              )}
-            </div>
-          {/* </div> */}
+          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <IonIcon icon={filterOutline} />
+            Filtre des signalements
+          </div>
+          
+          <IonSegment value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
+            <IonSegmentButton value="all" style={{ '--color-checked': '#3880ff' }}>
+              <IonIcon icon={peopleOutline} />
+              <IonLabel>Tous</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
+              <IonIcon icon={personOutline} />
+              <IonLabel>Mes signalements</IonLabel>
+            </IonSegmentButton>
+          </IonSegment>
+          
+          <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+            <div>Total: {filteredSignalements.length} signalement(s)</div>
+            <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
+            <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
+            <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
+            {filterType === 'mine' && (
+              <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
+                <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
+              </div>
+            )}
+          </div>
         </IonToolbar>
       </IonHeader>
 
@@ -620,6 +719,12 @@ const Home: React.FC = () => {
                           {getStatutText(signalement.statut)}
                         </IonBadge>
                         {isMine && <IonBadge color="primary" style={{ marginLeft: '5px' }}>Moi</IonBadge>}
+                        {/* NOUVEAU: Badge pour les photos */}
+                        {signalement.photos && signalement.photos.length > 0 && (
+                          <IonBadge color="medium" style={{ marginLeft: '5px' }}>
+                            📸 {signalement.photos.length}
+                          </IonBadge>
+                        )}
                         <br />
                         <strong>Entreprise:</strong> {signalement.entreprise_responsable || 'Pas encore defini'}<br />
                         <strong>Avancement:</strong> {signalement.avancement}%<br />
@@ -675,10 +780,15 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          
-
-          {/* Boutons FAB */}
-          
+          {/* Input file caché pour la galerie */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="image/*"
+            multiple
+            onChange={handleFileSelect}
+          />
 
           {/* Légende */}
           <div style={{
@@ -777,7 +887,71 @@ const Home: React.FC = () => {
                 />
               </IonItem>
               
-              
+              {/* NOUVEAU: Section pour ajouter des photos */}
+              <IonItem>
+                <IonLabel position="stacked">Photos</IonLabel>
+                <div style={{ width: '100%', marginTop: '10px' }}>
+                  <IonButton 
+                    expand="block" 
+                    color="medium" 
+                    fill="outline"
+                    onClick={() => setShowPhotoOptions(true)}
+                  >
+                    <IonIcon icon={cameraOutline} slot="start" />
+                    Ajouter des photos
+                    {selectedPhotos.length > 0 && (
+                      <IonBadge color="primary" slot="end" style={{ marginLeft: '8px' }}>
+                        {selectedPhotos.length}
+                      </IonBadge>
+                    )}
+                  </IonButton>
+                  
+                  {/* Affichage des photos sélectionnées */}
+                  {selectedPhotos.length > 0 && (
+                    <div style={{ marginTop: '15px' }}>
+                      <IonGrid>
+                        <IonRow>
+                          {selectedPhotos.map((photo, index) => (
+                            <IonCol size="4" key={photo.id}>
+                              <div style={{ position: 'relative' }}>
+                                <img 
+                                  src={photo.base64} 
+                                  alt={`Photo ${index + 1}`}
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '80px', 
+                                    objectFit: 'cover',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => viewPhoto(index)}
+                                />
+                                <IonButton 
+                                  fill="clear" 
+                                  size="small" 
+                                  style={{ 
+                                    position: 'absolute', 
+                                    top: '-8px', 
+                                    right: '-8px',
+                                    padding: '0',
+                                    minWidth: '24px',
+                                    height: '24px',
+                                    '--background': 'rgba(255, 255, 255, 0.9)',
+                                    '--border-radius': '50%'
+                                  }}
+                                  onClick={() => removePhoto(photo.id)}
+                                >
+                                  <IonIcon icon={closeCircleOutline} color="danger" size="small" />
+                                </IonButton>
+                              </div>
+                            </IonCol>
+                          ))}
+                        </IonRow>
+                      </IonGrid>
+                    </div>
+                  )}
+                </div>
+              </IonItem>
             </IonList>
             
             <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
@@ -856,7 +1030,65 @@ const Home: React.FC = () => {
                       <IonIcon icon={personOutline} /> Mon signalement
                     </IonBadge>
                   )}
+                  {/* NOUVEAU: Badge pour les photos */}
+                  {selectedSignalement.photos && selectedSignalement.photos.length > 0 && (
+                    <IonBadge color="medium" style={{ marginLeft: '10px', fontSize: '14px', padding: '5px 10px' }}>
+                      📸 {selectedSignalement.photos.length} photo(s)
+                    </IonBadge>
+                  )}
                 </div>
+                
+                {/* NOUVEAU: Affichage des photos dans les détails */}
+                {selectedSignalement.photos && selectedSignalement.photos.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                      <IonIcon icon={cameraOutline} style={{ marginRight: '8px', color: '#666' }} />
+                      <strong>Photos:</strong>
+                    </div>
+                    <IonGrid>
+                      <IonRow>
+                        {selectedSignalement.photos.map((photo, index) => (
+                          <IonCol size="4" key={index}>
+                            <div 
+                              style={{ 
+                                position: 'relative',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                setSelectedPhotoIndex(index);
+                                setShowPhotoViewer(true);
+                              }}
+                            >
+                              <img 
+                                src={photo} 
+                                alt={`Photo ${index + 1}`}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '80px', 
+                                  objectFit: 'cover',
+                                  borderRadius: '5px',
+                                  border: '1px solid #ddd'
+                                }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '5px',
+                                right: '5px',
+                                background: 'rgba(0,0,0,0.7)',
+                                color: 'white',
+                                fontSize: '10px',
+                                padding: '2px 5px',
+                                borderRadius: '3px'
+                              }}>
+                                {index + 1}/{selectedSignalement.photos.length}
+                              </div>
+                            </div>
+                          </IonCol>
+                        ))}
+                      </IonRow>
+                    </IonGrid>
+                  </div>
+                )}
                 
                 <div style={{ marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
@@ -898,13 +1130,13 @@ const Home: React.FC = () => {
                     </div>
                   </div>
                   
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
-                        <IonIcon icon={cashOutline} style={{ marginRight: '8px', color: '#666' }} />
-                        <strong>Budget:</strong>
-                      </div>
-                      <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.budget || 0} Ar</p>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                      <IonIcon icon={cashOutline} style={{ marginRight: '8px', color: '#666' }} />
+                      <strong>Budget:</strong>
                     </div>
+                    <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.budget || 0} Ar</p>
+                  </div>
                   
                   {selectedSignalement.surface_m2 && (
                     <div>
@@ -980,6 +1212,112 @@ const Home: React.FC = () => {
                 Voir sur la carte
               </IonButton>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* NOUVEAU: ActionSheet pour les options photo */}
+      <IonActionSheet
+        isOpen={showPhotoOptions}
+        onDidDismiss={() => setShowPhotoOptions(false)}
+        header="Ajouter des photos"
+        buttons={[
+          {
+            text: 'Prendre une photo',
+            icon: cameraOutline,
+            handler: takePhoto
+          },
+          {
+            text: 'Choisir depuis la galerie',
+            icon: imageOutline,
+            handler: selectFromGallery
+          },
+          {
+            text: 'Annuler',
+            role: 'cancel'
+          }
+        ]}
+      />
+
+      {/* NOUVEAU: Visionneuse de photos */}
+      {showPhotoViewer && selectedSignalement && selectedSignalement.photos && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.95)',
+          zIndex: 3000,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div style={{ 
+            position: 'absolute', 
+            top: '20px', 
+            right: '20px', 
+            zIndex: 3001 
+          }}>
+            <IonButton 
+              fill="clear" 
+              color="light"
+              onClick={() => setShowPhotoViewer(false)}
+            >
+              ✕
+            </IonButton>
+          </div>
+          
+          <div style={{ 
+            width: '100%', 
+            height: '70%', 
+            display: 'flex', 
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <img 
+              src={selectedSignalement.photos[selectedPhotoIndex]} 
+              alt={`Photo ${selectedPhotoIndex + 1}`}
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '100%',
+                objectFit: 'contain'
+              }}
+            />
+          </div>
+          
+          <div style={{ 
+            position: 'absolute', 
+            bottom: '30px', 
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <IonButton 
+              color="light" 
+              fill="clear"
+              disabled={selectedPhotoIndex === 0}
+              onClick={() => setSelectedPhotoIndex(prev => prev - 1)}
+            >
+              Précédent
+            </IonButton>
+            
+            <span style={{ color: 'white', fontSize: '16px' }}>
+              {selectedPhotoIndex + 1} / {selectedSignalement.photos.length}
+            </span>
+            
+            <IonButton 
+              color="light" 
+              fill="clear"
+              disabled={selectedPhotoIndex === selectedSignalement.photos.length - 1}
+              onClick={() => setSelectedPhotoIndex(prev => prev + 1)}
+            >
+              Suivant
+            </IonButton>
           </div>
         </div>
       )}
