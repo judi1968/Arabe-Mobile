@@ -410,39 +410,195 @@ const Home: React.FC = () => {
     setSelectedPhotos([]);
   };
 
-  // NOUVEAU: Prendre une photo avec la caméra (navigateur)
   const takePhoto = async () => {
-    try {
-      // Créer un input file pour accéder à la caméra
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.capture = 'environment'; // Utiliser la caméra arrière si disponible
-      
-      input.onchange = async (e: any) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
+  try {
+    // Vérifier si l'API MediaDevices est disponible
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        // Démarrer la caméra directement
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user', // Caméra selfie
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }, 
+          audio: false 
+        });
+        
+        // Créer une interface caméra personnalisée
+        const cameraModal = document.createElement('div');
+        cameraModal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: black;
+          z-index: 9999;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+        `;
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.style.cssText = `
+          max-width: 100%;
+          max-height: 70%;
+          object-fit: contain;
+        `;
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+          margin-top: 20px;
+          display: flex;
+          gap: 20px;
+        `;
+        
+        const captureBtn = document.createElement('button');
+        captureBtn.textContent = '📸 Prendre la photo';
+        captureBtn.style.cssText = `
+          padding: 12px 24px;
+          background: #3880ff;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          cursor: pointer;
+        `;
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✕ Annuler';
+        cancelBtn.style.cssText = `
+          padding: 12px 24px;
+          background: #6c757d;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 16px;
+          cursor: pointer;
+        `;
+        
+        const canvas = document.createElement('canvas');
+        canvas.style.display = 'none';
+        
+        // Assembler l'interface
+        buttonContainer.appendChild(captureBtn);
+        buttonContainer.appendChild(cancelBtn);
+        cameraModal.appendChild(video);
+        cameraModal.appendChild(buttonContainer);
+        document.body.appendChild(cameraModal);
+        document.body.appendChild(canvas);
+        
+        // Fonction pour capturer la photo
+        const capturePhoto = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convertir en base64
+            const base64 = canvas.toDataURL('image/jpeg', 0.9);
+            
             const newPhoto: Photo = {
               id: Date.now().toString(),
-              base64: reader.result as string,
-              name: file.name
+              base64: base64,
+              name: `photo_${Date.now()}.jpg`
             };
+            
             setSelectedPhotos(prev => [...prev, newPhoto]);
-          };
-          reader.readAsDataURL(file);
-        }
-        setShowPhotoOptions(false);
-      };
-      
-      input.click();
-    } catch (error) {
-      console.error('Erreur caméra:', error);
-      setToastMessage('Erreur lors de la prise de photo');
-      setShowToast(true);
+            setToastMessage('Photo prise avec succès');
+            setShowToast(true);
+          }
+          
+          // Nettoyer
+          cleanupCamera();
+        };
+        
+        // Fonction de nettoyage
+        const cleanupCamera = () => {
+          // Arrêter le flux vidéo
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Supprimer les éléments du DOM
+          if (cameraModal.parentNode) {
+            cameraModal.parentNode.removeChild(cameraModal);
+          }
+          if (canvas.parentNode) {
+            canvas.parentNode.removeChild(canvas);
+          }
+          
+          setShowPhotoOptions(false);
+        };
+        
+        // Événements
+        captureBtn.onclick = capturePhoto;
+        cancelBtn.onclick = cleanupCamera;
+        
+        // Échappement avec la touche ESC
+        const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') cleanupCamera();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        
+        // Nettoyer l'écouteur d'événement
+        cameraModal.addEventListener('cleanup', () => {
+          document.removeEventListener('keydown', handleKeyDown);
+        });
+        
+        return; // Sortir de la fonction
+      } catch (error) {
+        console.log('Accès direct à la caméra refusé ou non disponible:', error);
+        // Continuer avec la méthode input file
+      }
     }
-  };
+    
+    // Méthode de repli: input file standard
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    // Essayer d'ouvrir la caméra (fonctionne sur mobile, peut ouvrir l'explorateur sur desktop)
+    input.setAttribute('capture', 'user');
+    
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const newPhoto: Photo = {
+            id: Date.now().toString(),
+            base64: reader.result as string,
+            name: file.name || `photo_${Date.now()}.jpg`
+          };
+          setSelectedPhotos(prev => [...prev, newPhoto]);
+          setToastMessage('Photo ajoutée');
+          setShowToast(true);
+        };
+        reader.readAsDataURL(file);
+      }
+      setShowPhotoOptions(false);
+      
+      // Nettoyer
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    
+  } catch (error) {
+    console.error('Erreur caméra:', error);
+    setToastMessage('Erreur lors de la prise de photo');
+    setShowToast(true);
+  }
+};
 
   // NOUVEAU: Sélectionner des photos depuis la galerie
   const selectFromGallery = () => {
