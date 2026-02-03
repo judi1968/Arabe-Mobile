@@ -182,9 +182,9 @@ const Home: React.FC = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formStatut, setFormStatut] = useState<number>(1);
   const [formSurface, setFormSurface] = useState<string>('');
-  const [formBudget, setFormBudget] = useState<string>('');
+  const [formBudget, setFormBudget] = useState<string>('0');
   const [formAvancement, setFormAvancement] = useState<string>('0');
-  const [formEntreprise, setFormEntreprise] = useState<string>('');
+  const [formEntreprise, setFormEntreprise] = useState(null);
   
   const mapRef = useRef<any>(null);
   const history = useHistory();
@@ -248,10 +248,7 @@ const Home: React.FC = () => {
         });
         setEntreprises(entreprisesList);
         
-        // Sélectionner la première entreprise par défaut
-        if (entreprisesList.length > 0 && !formEntreprise) {
-          setFormEntreprise(entreprisesList[0].nom);
-        }
+        
       });
       
       // Charger TOUS les signalements
@@ -383,9 +380,7 @@ const Home: React.FC = () => {
     setFormSurface('');
     setFormBudget('');
     setFormAvancement('0');
-    if (entreprises.length > 0) {
-      setFormEntreprise(entreprises[0].nom);
-    }
+    setFormEntreprise(null)
   };
 
   // Ajouter un nouveau signalement dans Firebase
@@ -518,7 +513,46 @@ const Home: React.FC = () => {
     <IonPage style={{ height: '100vh' }}>
       <IonHeader>
         <IonToolbar>
-          
+          {/* Sélecteur de filtre */}
+          {/* <div style={{
+            position: 'absolute',
+            top: '70px',
+            left: '10px',
+            zIndex: 1000,
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            borderRadius: '10px',
+            padding: '10px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            minWidth: '180px'
+          }}> */}
+            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <IonIcon icon={filterOutline} />
+              Filtre des signalements
+            </div>
+            
+            <IonSegment value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
+              <IonSegmentButton value="all" style={{ '--color-checked': '#3880ff' }}>
+                <IonIcon icon={peopleOutline} />
+                <IonLabel>Tous</IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
+                <IonIcon icon={personOutline} />
+                <IonLabel>Mes signalements</IonLabel>
+              </IonSegmentButton>
+            </IonSegment>
+            
+            <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+              <div>Total: {filteredSignalements.length} signalement(s)</div>
+              <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
+              <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
+              <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
+              {filterType === 'mine' && (
+                <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
+                  <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
+                </div>
+              )}
+            </div>
+          {/* </div> */}
         </IonToolbar>
       </IonHeader>
 
@@ -587,7 +621,7 @@ const Home: React.FC = () => {
                         </IonBadge>
                         {isMine && <IonBadge color="primary" style={{ marginLeft: '5px' }}>Moi</IonBadge>}
                         <br />
-                        <strong>Entreprise:</strong> {signalement.entreprise_responsable}<br />
+                        <strong>Entreprise:</strong> {signalement.entreprise_responsable || 'Pas encore defini'}<br />
                         <strong>Avancement:</strong> {signalement.avancement}%<br />
                         <strong>Par:</strong> {signalement.userEmail}
                       </small>
@@ -641,65 +675,10 @@ const Home: React.FC = () => {
             )}
           </div>
 
-          {/* Sélecteur de filtre */}
-          <div style={{
-            position: 'absolute',
-            top: '70px',
-            left: '10px',
-            zIndex: 1000,
-            backgroundColor: 'rgba(255,255,255,0.95)',
-            borderRadius: '10px',
-            padding: '10px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            minWidth: '180px'
-          }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <IonIcon icon={filterOutline} />
-              Filtre des signalements
-            </div>
-            
-            <IonSegment value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
-              <IonSegmentButton value="all" style={{ '--color-checked': '#3880ff' }}>
-                <IonIcon icon={peopleOutline} />
-                <IonLabel>Tous</IonLabel>
-              </IonSegmentButton>
-              <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
-                <IonIcon icon={personOutline} />
-                <IonLabel>Mes signalements</IonLabel>
-              </IonSegmentButton>
-            </IonSegment>
-            
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-              <div>Total: {filteredSignalements.length} signalement(s)</div>
-              <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
-              <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
-              <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
-              {filterType === 'mine' && (
-                <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
-                  <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
-                </div>
-              )}
-            </div>
-          </div>
+          
 
           {/* Boutons FAB */}
-          <IonFab vertical="top" horizontal="end" slot="fixed" style={{ top: '70px' }}>
-            <IonFabButton size="small" onClick={forceMapResize}>
-              <IonIcon icon={refreshOutline} />
-            </IonFabButton>
-          </IonFab>
-
-          <IonFab vertical="top" horizontal="end" slot="fixed" style={{ top: '130px' }}>
-            <IonFabButton size="small" onClick={() => position && setPosition(position)}>
-              <IonIcon icon={locationOutline} />
-            </IonFabButton>
-          </IonFab>
-
-          <IonFab vertical="bottom" horizontal="end" slot="fixed" style={{ bottom: '20px' }}>
-            <IonFabButton onClick={() => position && handleMapClick(position[0], position[1])}>
-              <IonIcon icon={addOutline} />
-            </IonFabButton>
-          </IonFab>
+          
 
           {/* Légende */}
           <div style={{
@@ -787,33 +766,7 @@ const Home: React.FC = () => {
                   rows={3}
                 />
               </IonItem>
-              
-              <IonItem>
-                <IonLabel position="stacked">Statut</IonLabel>
-                <IonSelect 
-                  value={formStatut} 
-                  onIonChange={e => setFormStatut(e.detail.value)}
-                >
-                  <IonSelectOption value={1}>Nouveau</IonSelectOption>
-                  <IonSelectOption value={2}>En cours</IonSelectOption>
-                  <IonSelectOption value={3}>Résolu</IonSelectOption>
-                </IonSelect>
-              </IonItem>
-              
-              <IonItem>
-                <IonLabel position="stacked">Entreprise responsable</IonLabel>
-                <IonSelect 
-                  value={formEntreprise} 
-                  onIonChange={e => setFormEntreprise(e.detail.value)}
-                >
-                  {entreprises.map(entreprise => (
-                    <IonSelectOption key={entreprise.id} value={entreprise.nom}>
-                      {entreprise.nom}
-                    </IonSelectOption>
-                  ))}
-                </IonSelect>
-              </IonItem>
-              
+
               <IonItem>
                 <IonLabel position="stacked">Surface (m²)</IonLabel>
                 <IonInput
@@ -824,26 +777,7 @@ const Home: React.FC = () => {
                 />
               </IonItem>
               
-              <IonItem>
-                <IonLabel position="stacked">Budget (€)</IonLabel>
-                <IonInput
-                  type="number"
-                  value={formBudget}
-                  onIonChange={e => setFormBudget(e.detail.value || '')}
-                  placeholder="Ex: 1500"
-                />
-              </IonItem>
               
-              <IonItem>
-                <IonLabel position="stacked">Avancement (%)</IonLabel>
-                <IonInput
-                  type="number"
-                  value={formAvancement}
-                  onIonChange={e => setFormAvancement(e.detail.value || '')}
-                  min="0"
-                  max="100"
-                />
-              </IonItem>
             </IonList>
             
             <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
@@ -937,7 +871,7 @@ const Home: React.FC = () => {
                     <IonIcon icon={businessOutline} style={{ marginRight: '8px', color: '#666' }} />
                     <strong>Entreprise responsable:</strong>
                   </div>
-                  <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.entreprise_responsable}</p>
+                  <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.entreprise_responsable || 'Pas encore defini'}</p>
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
@@ -959,20 +893,18 @@ const Home: React.FC = () => {
                             }}
                           ></div>
                         </div>
-                        <span>{selectedSignalement.avancement}%</span>
+                        <span>{selectedSignalement.avancement || 0}%</span>
                       </div>
                     </div>
                   </div>
                   
-                  {selectedSignalement.budget && (
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
                         <IonIcon icon={cashOutline} style={{ marginRight: '8px', color: '#666' }} />
                         <strong>Budget:</strong>
                       </div>
-                      <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.budget} €</p>
+                      <p style={{ marginLeft: '24px', marginTop: 0 }}>{selectedSignalement.budget || 0} Ar</p>
                     </div>
-                  )}
                   
                   {selectedSignalement.surface_m2 && (
                     <div>

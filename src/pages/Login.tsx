@@ -5,7 +5,8 @@ import {
   IonButton,
   IonText,
   IonIcon,
-  IonLoading
+  IonLoading,
+  IonAlert
 } from '@ionic/react';
 
 import { personOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
@@ -15,7 +16,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 
 import './assets/css/Login.css';
-
+import logo from  '../assets/images/logo.jpg'
 const Login: React.FC = () => {
   const [email, setEmail] = useState('test@gmail.com');
   const [motDePasse, setMotDePasse] = useState('test1234');
@@ -44,12 +45,13 @@ const Login: React.FC = () => {
       <IonContent fullscreen className="ion-padding">
 
         <div className="login-card">
+          <img src={logo} alt="Logo" style={{ width: 150 }} />
           <IonText className="login-title">
-            <h1><i>ARABE</i></h1>
+            <h1><i>Arabe</i></h1>
             <p>Connexion</p>
           </IonText>
 
-          {erreur && <IonText color="danger">{erreur}</IonText>}
+         
 
           {/* EMAIL */}
           <div className="input-group">
@@ -90,6 +92,14 @@ const Login: React.FC = () => {
             Se connecter
           </IonButton>
         </div>
+
+         <IonAlert
+            isOpen={!!erreur}
+            header="Erreur de connexion"
+            message={erreur}
+            buttons={['OK']}
+            onDidDismiss={() => setErreur('')}
+          />
 
         <IonLoading
           isOpen={isLoading}

@@ -21,7 +21,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 import { useHistory } from 'react-router';
 import { home, power } from 'ionicons/icons';
-
+import logo from '../assets/images/logo.jpg'
 const AppLayout: React.FC = () => {
   const history = useHistory();
 
@@ -65,7 +65,7 @@ const AppLayout: React.FC = () => {
             <IonButtons slot="start">
               <IonMenuButton />
             </IonButtons>
-            <IonTitle>Arabe</IonTitle>
+            <IonTitle> <span style={{ 'display' : 'flex' , 'align-items' : 'center'}}> <img src={logo} alt="Logo" style={{ width: 50 }} /><span style={{ 'color' : 'rgb(91, 7, 94)'}}><b>Arabe</b></span> </span></IonTitle>
           </IonToolbar>
         </IonHeader>
 
