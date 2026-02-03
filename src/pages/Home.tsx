@@ -177,6 +177,75 @@ const RecenterMap: React.FC<{ position: [number, number] }> = ({ position }) => 
   return null;
 };
 
+// NOUVEAU: Fonction pour compresser les images
+const compressImage = (base64: string, maxWidth = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64;
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      
+      // Redimensionner si trop large
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        // Compresser en JPEG avec qualité réduite
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedBase64);
+      } else {
+        resolve(base64); // Retourner l'original si erreur
+      }
+    };
+    
+    img.onerror = () => {
+      resolve(base64); // Retourner l'original si erreur
+    };
+  });
+};
+
+// NOUVEAU: Fonction pour compresser toutes les photos
+const compressAllPhotos = async (photos: Photo[]): Promise<string[]> => {
+  const compressedPhotos: string[] = [];
+  
+  for (const photo of photos) {
+    try {
+      // Vérifier la taille actuelle
+      console.log('Taille originale:', photo.base64.length, 'bytes');
+      
+      // Compresser l'image
+      const compressed = await compressImage(photo.base64, 800, 0.6);
+      
+      // Vérifier si encore trop grande
+      if (compressed.length > 900000) { // Laisser une marge
+        // Compression encore plus agressive
+        const moreCompressed = await compressImage(compressed, 600, 0.5);
+        compressedPhotos.push(moreCompressed);
+        console.log('Photo compressée agressivement:', moreCompressed.length, 'bytes');
+      } else {
+        compressedPhotos.push(compressed);
+        console.log('Photo compressée:', compressed.length, 'bytes');
+      }
+    } catch (error) {
+      console.error('Erreur compression:', error);
+      // Garder l'original si erreur
+      compressedPhotos.push(photo.base64);
+    }
+  }
+  
+  return compressedPhotos;
+};
+
 const Home: React.FC = () => {
   const [position, setPosition] = useState<[number, number] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -410,195 +479,256 @@ const Home: React.FC = () => {
     setSelectedPhotos([]);
   };
 
-  const takePhoto = async () => {
-  try {
-    // Vérifier si l'API MediaDevices est disponible
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        // Démarrer la caméra directement
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'user', // Caméra selfie
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }, 
-          audio: false 
-        });
-        
-        // Créer une interface caméra personnalisée
-        const cameraModal = document.createElement('div');
-        cameraModal.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: black;
-          z-index: 9999;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-        `;
-        
-        const video = document.createElement('video');
+  // NOUVEAU: Fonction de capture de photo améliorée avec compression
+  const capturePhotoFromCamera = async () => {
+    return new Promise<string>((resolve) => {
+      const canvas = document.createElement('canvas');
+      const video = document.createElement('video');
+      
+      navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' },
+        audio: false 
+      }).then(stream => {
         video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        video.style.cssText = `
-          max-width: 100%;
-          max-height: 70%;
-          object-fit: contain;
-        `;
+        video.play();
         
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = `
-          margin-top: 20px;
-          display: flex;
-          gap: 20px;
-        `;
-        
-        const captureBtn = document.createElement('button');
-        captureBtn.textContent = '📸 Prendre la photo';
-        captureBtn.style.cssText = `
-          padding: 12px 24px;
-          background: #3880ff;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
-        `;
-        
-        const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = '✕ Annuler';
-        cancelBtn.style.cssText = `
-          padding: 12px 24px;
-          background: #6c757d;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
-        `;
-        
-        const canvas = document.createElement('canvas');
-        canvas.style.display = 'none';
-        
-        // Assembler l'interface
-        buttonContainer.appendChild(captureBtn);
-        buttonContainer.appendChild(cancelBtn);
-        cameraModal.appendChild(video);
-        cameraModal.appendChild(buttonContainer);
-        document.body.appendChild(cameraModal);
-        document.body.appendChild(canvas);
-        
-        // Fonction pour capturer la photo
-        const capturePhoto = () => {
+        video.onloadedmetadata = () => {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setTimeout(() => {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const base64 = canvas.toDataURL('image/jpeg', 0.8); // Qualité 80%
+              
+              // Arrêter le flux
+              stream.getTracks().forEach(track => track.stop());
+              
+              resolve(base64);
+            }
+          }, 500);
+        };
+      }).catch(error => {
+        console.error('Erreur caméra:', error);
+        resolve('');
+      });
+    });
+  };
+
+  const takePhoto = async () => {
+    try {
+      // Vérifier si l'API MediaDevices est disponible
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          // Démarrer la caméra directement
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'user', // Caméra selfie
+              width: { ideal: 1024 }, // Réduire la résolution
+              height: { ideal: 768 }
+            }, 
+            audio: false 
+          });
+          
+          // Créer une interface caméra personnalisée
+          const cameraModal = document.createElement('div');
+          cameraModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+          `;
+          
+          const video = document.createElement('video');
+          video.srcObject = stream;
+          video.autoplay = true;
+          video.playsInline = true;
+          video.style.cssText = `
+            max-width: 100%;
+            max-height: 70%;
+            object-fit: contain;
+          `;
+          
+          const buttonContainer = document.createElement('div');
+          buttonContainer.style.cssText = `
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+          `;
+          
+          const captureBtn = document.createElement('button');
+          captureBtn.textContent = '📸 Prendre la photo';
+          captureBtn.style.cssText = `
+            padding: 12px 24px;
+            background: #3880ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+          `;
+          
+          const cancelBtn = document.createElement('button');
+          cancelBtn.textContent = '✕ Annuler';
+          cancelBtn.style.cssText = `
+            padding: 12px 24px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+          `;
+          
+          const canvas = document.createElement('canvas');
+          canvas.style.display = 'none';
+          
+          // Assembler l'interface
+          buttonContainer.appendChild(captureBtn);
+          buttonContainer.appendChild(cancelBtn);
+          cameraModal.appendChild(video);
+          cameraModal.appendChild(buttonContainer);
+          document.body.appendChild(cameraModal);
+          document.body.appendChild(canvas);
+          
+          // Fonction pour capturer la photo
+          const capturePhoto = async () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             
-            // Convertir en base64
-            const base64 = canvas.toDataURL('image/jpeg', 0.9);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              
+              // Convertir en base64 avec qualité réduite
+              let base64 = canvas.toDataURL('image/jpeg', 0.7); // Qualité 70%
+              
+              // COMPRESSER l'image
+              try {
+                base64 = await compressImage(base64, 800, 0.6);
+              } catch (compressError) {
+                console.error('Erreur compression:', compressError);
+              }
+              
+              // Afficher la taille pour débogage
+              console.log('Taille photo après compression:', base64.length, 'bytes');
+              
+              const newPhoto: Photo = {
+                id: Date.now().toString(),
+                base64: base64,
+                name: `photo_${Date.now()}.jpg`
+              };
+              
+              setSelectedPhotos(prev => [...prev, newPhoto]);
+              setToastMessage('Photo prise avec succès');
+              setShowToast(true);
+            }
+            
+            // Nettoyer
+            cleanupCamera();
+          };
+          
+          // Fonction de nettoyage
+          const cleanupCamera = () => {
+            // Arrêter le flux vidéo
+            stream.getTracks().forEach(track => track.stop());
+            
+            // Supprimer les éléments du DOM
+            if (cameraModal.parentNode) {
+              cameraModal.parentNode.removeChild(cameraModal);
+            }
+            if (canvas.parentNode) {
+              canvas.parentNode.removeChild(canvas);
+            }
+            
+            setShowPhotoOptions(false);
+          };
+          
+          // Événements
+          captureBtn.onclick = capturePhoto;
+          cancelBtn.onclick = cleanupCamera;
+          
+          // Échappement avec la touche ESC
+          const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') cleanupCamera();
+          };
+          document.addEventListener('keydown', handleKeyDown);
+          
+          // Nettoyer l'écouteur d'événement
+          const cleanupListener = () => {
+            document.removeEventListener('keydown', handleKeyDown);
+          };
+          cameraModal.addEventListener('click', cleanupListener);
+          
+          return; // Sortir de la fonction
+        } catch (error) {
+          console.log('Accès direct à la caméra refusé ou non disponible:', error);
+          // Continuer avec la méthode input file
+        }
+      }
+      
+      // Méthode de repli: input file standard
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      
+      // Essayer d'ouvrir la caméra (fonctionne sur mobile, peut ouvrir l'explorateur sur desktop)
+      input.setAttribute('capture', 'user');
+      
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            let base64 = reader.result as string;
+            
+            // COMPRESSER l'image si elle est trop grande
+            if (base64.length > 500000) { // Si > 500KB
+              try {
+                base64 = await compressImage(base64, 800, 0.6);
+                console.log('Photo compressée depuis galerie:', base64.length, 'bytes');
+              } catch (compressError) {
+                console.error('Erreur compression galerie:', compressError);
+              }
+            }
             
             const newPhoto: Photo = {
               id: Date.now().toString(),
               base64: base64,
-              name: `photo_${Date.now()}.jpg`
+              name: file.name || `photo_${Date.now()}.jpg`
             };
             
             setSelectedPhotos(prev => [...prev, newPhoto]);
-            setToastMessage('Photo prise avec succès');
+            setToastMessage('Photo ajoutée');
             setShowToast(true);
-          }
-          
-          // Nettoyer
-          cleanupCamera();
-        };
-        
-        // Fonction de nettoyage
-        const cleanupCamera = () => {
-          // Arrêter le flux vidéo
-          stream.getTracks().forEach(track => track.stop());
-          
-          // Supprimer les éléments du DOM
-          if (cameraModal.parentNode) {
-            cameraModal.parentNode.removeChild(cameraModal);
-          }
-          if (canvas.parentNode) {
-            canvas.parentNode.removeChild(canvas);
-          }
-          
-          setShowPhotoOptions(false);
-        };
-        
-        // Événements
-        captureBtn.onclick = capturePhoto;
-        cancelBtn.onclick = cleanupCamera;
-        
-        // Échappement avec la touche ESC
-        const handleKeyDown = (e: KeyboardEvent) => {
-          if (e.key === 'Escape') cleanupCamera();
-        };
-        document.addEventListener('keydown', handleKeyDown);
-        
-        // Nettoyer l'écouteur d'événement
-        cameraModal.addEventListener('cleanup', () => {
-          document.removeEventListener('keydown', handleKeyDown);
-        });
-        
-        return; // Sortir de la fonction
-      } catch (error) {
-        console.log('Accès direct à la caméra refusé ou non disponible:', error);
-        // Continuer avec la méthode input file
-      }
-    }
-    
-    // Méthode de repli: input file standard
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    // Essayer d'ouvrir la caméra (fonctionne sur mobile, peut ouvrir l'explorateur sur desktop)
-    input.setAttribute('capture', 'user');
-    
-    input.onchange = async (e: any) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const newPhoto: Photo = {
-            id: Date.now().toString(),
-            base64: reader.result as string,
-            name: file.name || `photo_${Date.now()}.jpg`
           };
-          setSelectedPhotos(prev => [...prev, newPhoto]);
-          setToastMessage('Photo ajoutée');
-          setShowToast(true);
-        };
-        reader.readAsDataURL(file);
-      }
-      setShowPhotoOptions(false);
+          reader.readAsDataURL(file);
+        }
+        setShowPhotoOptions(false);
+        
+        // Nettoyer
+        if (input.parentNode) {
+          input.parentNode.removeChild(input);
+        }
+      };
       
-      // Nettoyer
-      if (input.parentNode) {
-        input.parentNode.removeChild(input);
-      }
-    };
-    
-    document.body.appendChild(input);
-    input.click();
-    
-  } catch (error) {
-    console.error('Erreur caméra:', error);
-    setToastMessage('Erreur lors de la prise de photo');
-    setShowToast(true);
-  }
-};
+      document.body.appendChild(input);
+      input.click();
+      
+    } catch (error) {
+      console.error('Erreur caméra:', error);
+      setToastMessage('Erreur lors de la prise de photo');
+      setShowToast(true);
+    }
+  };
 
   // NOUVEAU: Sélectionner des photos depuis la galerie
   const selectFromGallery = () => {
@@ -607,30 +737,52 @@ const Home: React.FC = () => {
     }
   };
 
-  // NOUVEAU: Gérer la sélection de fichiers
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // NOUVEAU: Gérer la sélection de fichiers avec compression
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       const newPhotos: Photo[] = [];
       
-      Array.from(files).forEach(file => {
+      // Limiter à 5 photos maximum
+      const limitedFiles = Array.from(files).slice(0, 5);
+      
+      for (const file of limitedFiles) {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          const newPhoto: Photo = {
-            id: Date.now().toString() + Math.random(),
-            base64: reader.result as string,
-            name: file.name
+        
+        await new Promise<void>((resolve) => {
+          reader.onloadend = async () => {
+            let base64 = reader.result as string;
+            
+            // Vérifier la taille et compresser si nécessaire
+            if (base64.length > 300000) { // Si > 300KB
+              try {
+                base64 = await compressImage(base64, 800, 0.6);
+                console.log('Photo compressée:', base64.length, 'bytes');
+              } catch (compressError) {
+                console.error('Erreur compression:', compressError);
+              }
+            }
+            
+            const newPhoto: Photo = {
+              id: Date.now().toString() + Math.random(),
+              base64: base64,
+              name: file.name
+            };
+            newPhotos.push(newPhoto);
+            resolve();
           };
-          newPhotos.push(newPhoto);
-          
-          // Quand toutes les photos sont chargées
-          if (newPhotos.length === files.length) {
-            setSelectedPhotos(prev => [...prev, ...newPhotos]);
-            setShowPhotoOptions(false);
-          }
-        };
-        reader.readAsDataURL(file);
-      });
+          reader.readAsDataURL(file);
+        });
+      }
+      
+      setSelectedPhotos(prev => [...prev, ...newPhotos]);
+      setShowPhotoOptions(false);
+      
+      // Avertir si trop de photos
+      if (files.length > 5) {
+        setToastMessage('Maximum 5 photos sélectionnées');
+        setShowToast(true);
+      }
     }
   };
 
@@ -645,7 +797,7 @@ const Home: React.FC = () => {
     setShowPhotoViewer(true);
   };
 
-  // Ajouter un nouveau signalement dans Firebase
+  // MODIFIÉ: Ajouter un nouveau signalement dans Firebase avec compression
   const ajouterSignalement = async () => {
     if (!clickedPoint || !formTitre.trim()) {
       setToastMessage("Le titre est obligatoire");
@@ -659,12 +811,47 @@ const Home: React.FC = () => {
       return;
     }
 
+    // NOUVEAU: Limiter le nombre de photos
+    if (selectedPhotos.length > 5) {
+      setToastMessage("Maximum 5 photos par signalement");
+      setShowToast(true);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const user = auth.currentUser;
       
-      // NOUVEAU: Préparer les photos (extraire les base64)
-      const photoBase64Array = selectedPhotos.map(photo => photo.base64);
+      let photoBase64Array: string[] = [];
+      
+      if (selectedPhotos.length > 0) {
+        // Afficher un message de compression
+        setToastMessage("Compression des photos...");
+        setShowToast(true);
+        
+        // COMPRESSER toutes les photos avant l'envoi
+        photoBase64Array = await compressAllPhotos(selectedPhotos);
+        
+        // Vérifier si une photo est encore trop grande
+        const tooLargePhoto = photoBase64Array.find(photo => photo.length > 900000);
+        if (tooLargePhoto) {
+          setToastMessage("Une photo est encore trop grande. Veuillez en choisir une plus petite.");
+          setShowToast(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Vérifier la taille totale
+        const totalSize = photoBase64Array.reduce((sum, photo) => sum + photo.length, 0);
+        console.log('Taille totale des photos:', totalSize, 'bytes');
+        
+        if (totalSize > 3000000) { // 3MB max
+          setToastMessage("Les photos sont trop grandes au total. Réduisez le nombre ou la taille.");
+          setShowToast(true);
+          setIsLoading(false);
+          return;
+        }
+      }
       
       // Préparer les données du signalement
       const signalementData = {
@@ -680,11 +867,11 @@ const Home: React.FC = () => {
         utilisateur_id: user.uid,
         userEmail: user.email || '',
         synchronise_firebase: true,
-        // NOUVEAU: Ajouter les photos
+        // NOUVEAU: Ajouter les photos compressées
         photos: photoBase64Array
       };
 
-      console.log("Envoi du signalement:", signalementData);
+      console.log("Envoi du signalement avec", photoBase64Array.length, "photos compressées");
       
       // Ajouter le document dans la collection "signalements"
       const docRef = await addDoc(collection(db, "signalements"), signalementData);
@@ -702,7 +889,20 @@ const Home: React.FC = () => {
       
     } catch (error: any) {
       console.error("❌ Erreur lors de l'ajout:", error);
-      setToastMessage(`Erreur: ${error.message}`);
+      
+      // Message d'erreur spécifique pour les photos trop grandes
+      if (error.message.includes("longer than 1048487 bytes")) {
+        setToastMessage("Erreur: Les photos sont trop grandes. Elles seront automatiquement compressées.");
+        
+        // Essayer avec compression plus agressive
+        setTimeout(() => {
+          setToastMessage("Réessayez avec des photos plus petites");
+          setShowToast(true);
+        }, 2000);
+      } else {
+        setToastMessage(`Erreur: ${error.message}`);
+      }
+      
       setShowToast(true);
     } finally {
       setIsLoading(false);
@@ -1045,7 +1245,7 @@ const Home: React.FC = () => {
               
               {/* NOUVEAU: Section pour ajouter des photos */}
               <IonItem>
-                <IonLabel position="stacked">Photos</IonLabel>
+                <IonLabel position="stacked">Photos (max 5)</IonLabel>
                 <div style={{ width: '100%', marginTop: '10px' }}>
                   <IonButton 
                     expand="block" 
@@ -1057,7 +1257,7 @@ const Home: React.FC = () => {
                     Ajouter des photos
                     {selectedPhotos.length > 0 && (
                       <IonBadge color="primary" slot="end" style={{ marginLeft: '8px' }}>
-                        {selectedPhotos.length}
+                        {selectedPhotos.length}/5
                       </IonBadge>
                     )}
                   </IonButton>
@@ -1065,6 +1265,9 @@ const Home: React.FC = () => {
                   {/* Affichage des photos sélectionnées */}
                   {selectedPhotos.length > 0 && (
                     <div style={{ marginTop: '15px' }}>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+                        {selectedPhotos.length} photo(s) sélectionnée(s) - Compression automatique
+                      </div>
                       <IonGrid>
                         <IonRow>
                           {selectedPhotos.map((photo, index) => (
@@ -1099,6 +1302,18 @@ const Home: React.FC = () => {
                                 >
                                   <IonIcon icon={closeCircleOutline} color="danger" size="small" />
                                 </IonButton>
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: '2px',
+                                  left: '2px',
+                                  background: 'rgba(0,0,0,0.6)',
+                                  color: 'white',
+                                  fontSize: '9px',
+                                  padding: '1px 3px',
+                                  borderRadius: '2px'
+                                }}>
+                                  {(photo.base64.length / 1000).toFixed(0)}KB
+                                </div>
                               </div>
                             </IonCol>
                           ))}
