@@ -49,7 +49,17 @@ import {
   imageOutline,
   closeCircleOutline,
   trashOutline,
-  eyeOutline
+  eyeOutline,
+  list,
+  listSharp,
+  warning,
+  colorFill,
+  pencil,
+  pin,
+  fileTraySharp,
+  fileTray,
+  mapOutline,
+  documentOutline
 } from 'ionicons/icons';
 
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
@@ -565,15 +575,17 @@ const Home: React.FC = () => {
           `;
           
           const captureBtn = document.createElement('button');
-          captureBtn.textContent = '📸 Prendre la photo';
+          captureBtn.textContent = 'Prendre la photo';
           captureBtn.style.cssText = `
             padding: 12px 24px;
-            background: #3880ff;
+            background: #3880ff; 
             color: white;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
+            font-family: 'Segoe UI';
+
           `;
           
           const cancelBtn = document.createElement('button');
@@ -581,6 +593,7 @@ const Home: React.FC = () => {
           cancelBtn.style.cssText = `
             padding: 12px 24px;
             background: #6c757d;
+            font-family: 'Segoe UI';
             color: white;
             border: none;
             border-radius: 8px;
@@ -979,7 +992,7 @@ const Home: React.FC = () => {
   return (
     <IonPage style={{ height: '100vh' }}>
       <IonHeader>
-        <IonToolbar>
+        <IonToolbar style={{ padding: '10px'}}>
           {/* Sélecteur de filtre */}
           <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <IonIcon icon={filterOutline} />
@@ -1078,7 +1091,7 @@ const Home: React.FC = () => {
                         {/* NOUVEAU: Badge pour les photos */}
                         {signalement.photos && signalement.photos.length > 0 && (
                           <IonBadge color="medium" style={{ marginLeft: '5px' }}>
-                            📸 {signalement.photos.length}
+                             {signalement.photos.length}
                           </IonBadge>
                         )}
                         <br />
@@ -1205,10 +1218,17 @@ const Home: React.FC = () => {
             maxHeight: '90vh',
             overflowY: 'auto'
           }}>
-            <h2 style={{ marginTop: 0 }}>📋 Nouveau Signalement</h2>
-            
+            <div style={{
+              
+            }}>
+           
+            <h2 style={{display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={pencil} style={{ color : '#1623b0', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#1623b0'}}>Ajouter un nouveau signalement</span>  </h2>
+            </div>
             <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
-              <strong>📍 Position sélectionnée:</strong><br />
+              <strong><IonIcon icon={pin} style={{ color : '#d03939', marginRight: '5px'}} slot="start"/>  Position sélectionnée:</strong><br />
               Latitude: {clickedPoint?.lat.toFixed(6)}<br />
               Longitude: {clickedPoint?.lng.toFixed(6)}
             </div>
@@ -1337,15 +1357,25 @@ const Home: React.FC = () => {
                 Annuler
               </IonButton>
               
-              <IonButton 
-                expand="block" 
-                color="primary"
+             <IonButton
+                expand="block"
                 onClick={ajouterSignalement}
                 disabled={!formTitre.trim()}
+                className="btn-save"
               >
                 <IonIcon icon={saveOutline} slot="start" />
                 Enregistrer
               </IonButton>
+              <style>{`
+                .btn-save {
+                  --background: #1623b0;
+                  --background-hover: #0f1a8a;
+                  --background-activated: #0b1466;
+                  --color: white;
+                  font-weight: bold;
+                }
+              `}</style>
+
             </div>
           </div>
         </div>
@@ -1359,6 +1389,8 @@ const Home: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
+          // height: '50vh',
+          margin: '25vh 0 30vh 0',
           backgroundColor: 'rgba(0,0,0,0.5)',
           zIndex: 2000,
           display: 'flex',
@@ -1376,8 +1408,11 @@ const Home: React.FC = () => {
             overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h2 style={{ margin: 0 }}>📄 Détails du Signalement</h2>
-              <IonButton 
+              <h2 style={{display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={documentOutline} style={{ color : '#1623b0', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#1623b0'}}>Detail du signalement</span>  </h2>
+              <IonButton  
                 fill="clear" 
                 size="small" 
                 onClick={() => setShowDetailModal(false)}
@@ -1404,7 +1439,7 @@ const Home: React.FC = () => {
                   {/* NOUVEAU: Badge pour les photos */}
                   {selectedSignalement.photos && selectedSignalement.photos.length > 0 && (
                     <IonBadge color="medium" style={{ marginLeft: '10px', fontSize: '14px', padding: '5px 10px' }}>
-                      📸 {selectedSignalement.photos.length} photo(s)
+                       {selectedSignalement.photos.length} photo(s)
                     </IonBadge>
                   )}
                 </div>
@@ -1660,7 +1695,7 @@ const Home: React.FC = () => {
           
           <div style={{ 
             position: 'absolute', 
-            bottom: '30px', 
+            bottom: '80px', 
             left: 0,
             right: 0,
             display: 'flex',
