@@ -21,7 +21,8 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 import { useHistory } from 'react-router';
 import { home, power } from 'ionicons/icons';
-import logo from '../assets/images/logo.jpg'
+import logo from '../assets/images/logo.png'
+import './template.css'
 const AppLayout: React.FC = () => {
   const history = useHistory();
 
@@ -39,18 +40,18 @@ const AppLayout: React.FC = () => {
       {/* MENU GLOBAL */}
       <IonMenu contentId="main-content">
         <IonHeader>
-          <IonToolbar color="tertiary">
+          <IonToolbar className='bg-tomato'>
             <IonTitle>Menu</IonTitle>
           </IonToolbar>
         </IonHeader>
 
         <IonContent>
           <IonList>
-            <IonItem routerLink="/app/home">
+            <IonItem className='color-tomato' routerLink="/app/home">
               <IonIcon icon={home}></IonIcon>
               <IonLabel style={{'margin-left': '10px'}}>Accueil</IonLabel>
             </IonItem>
-            <IonItem button onClick={deconnexion}>
+            <IonItem className='color-tomato' button onClick={deconnexion}>
               <IonIcon icon={power}></IonIcon>
               <IonLabel style={{'margin-left': '10px'}}>Déconnexion</IonLabel>
             </IonItem>
@@ -61,11 +62,11 @@ const AppLayout: React.FC = () => {
       {/* LAYOUT PRINCIPAL */}
       <IonPage id="main-content">
         <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonMenuButton />
+          <IonToolbar >
+            <IonButtons  slot="start">
+              <IonMenuButton className='color-tomato' />
             </IonButtons>
-            <IonTitle> <span style={{ 'display' : 'flex' , 'align-items' : 'center'}}> <img src={logo} alt="Logo" style={{ width: 50 }} /><span style={{ 'color' : 'rgb(91, 7, 94)'}}><b>Arabe</b></span> </span></IonTitle>
+            <IonTitle> <span style={{ 'display' : 'flex' , alignItems : 'center'}}> <img src={logo} alt="Logo" style={{ width: 50 }} /><span className='color-tomato'><b><i>Arabe</i></b></span> </span></IonTitle>
           </IonToolbar>
         </IonHeader>
 

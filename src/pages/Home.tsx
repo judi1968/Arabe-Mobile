@@ -68,6 +68,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import './template.css'
 
 // Import Firebase
 import { 
@@ -989,38 +990,37 @@ const Home: React.FC = () => {
     }
   };
 
-  return (
-    <IonPage style={{ height: '100vh' }}>
-      <IonHeader>
+  return ( 
+    <IonPage  style={{ height: '100vh' }}>
+      <IonHeader style={{ display:'flex', width:'100%'}} >  
         <IonToolbar style={{ padding: '10px'}}>
-          {/* Sélecteur de filtre */}
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <IonIcon icon={filterOutline} />
-            Filtre des signalements
+          <div className='filtretoolbar' >
+            
+            
+            <IonSegment className='bg-tomato' style={{ color: 'white'}} value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
+              <IonSegmentButton value="all" style={{ '--color-checked': '#fc5130' }}>
+                <IonIcon icon={peopleOutline} />
+                <IonLabel>Tous</IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
+                <IonIcon icon={personOutline} />
+                <IonLabel>Mes signalements</IonLabel>
+              </IonSegmentButton>
+            </IonSegment>
+            
+            <div style={{ marginTop: '10px', fontSize: '12px', color: '#202020' }}>
+              <div>Total: {filteredSignalements.length} signalement(s)</div>
+              <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
+              <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
+              <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
+              {filterType === 'mine' && (
+                <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
+                  <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
+                </div>
+              )}
+            </div>
           </div>
           
-          <IonSegment value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
-            <IonSegmentButton value="all" style={{ '--color-checked': '#3880ff' }}>
-              <IonIcon icon={peopleOutline} />
-              <IonLabel>Tous</IonLabel>
-            </IonSegmentButton>
-            <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
-              <IonIcon icon={personOutline} />
-              <IonLabel>Mes signalements</IonLabel>
-            </IonSegmentButton>
-          </IonSegment>
-          
-          <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-            <div>Total: {filteredSignalements.length} signalement(s)</div>
-            <div>Nouveaux: {filteredSignalements.filter(s => s.statut === 1).length}</div>
-            <div>En cours: {filteredSignalements.filter(s => s.statut === 2).length}</div>
-            <div>Résolus: {filteredSignalements.filter(s => s.statut === 3).length}</div>
-            {filterType === 'mine' && (
-              <div style={{ marginTop: '5px', padding: '5px', backgroundColor: '#e6f7ff', borderRadius: '5px' }}>
-                <IonIcon icon={personOutline} size="small" /> {userId ? userEmail : 'Non connecté'}
-              </div>
-            )}
-          </div>
         </IonToolbar>
       </IonHeader>
 
@@ -1225,7 +1225,7 @@ const Home: React.FC = () => {
             <h2 style={{display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={pencil} style={{ color : '#1623b0', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#1623b0'}}>Ajouter un nouveau signalement</span>  </h2>
+              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={pencil} style={{ color : '#fc5130', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#fc5130'}}>Ajouter un nouveau signalement</span>  </h2>
             </div>
             <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px' }}>
               <strong><IonIcon icon={pin} style={{ color : '#d03939', marginRight: '5px'}} slot="start"/>  Position sélectionnée:</strong><br />
@@ -1411,7 +1411,7 @@ const Home: React.FC = () => {
               <h2 style={{display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={documentOutline} style={{ color : '#1623b0', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#1623b0'}}>Detail du signalement</span>  </h2>
+              alignContent: 'center', marginTop: 0 }}> <IonIcon icon={documentOutline} style={{ color : '#fc5130', marginRight: '5px'}} slot="start" size='large'/> <span style={{ color : '#fc5130'}}>Detail du signalement</span>  </h2>
               <IonButton  
                 fill="clear" 
                 size="small" 
@@ -1486,7 +1486,7 @@ const Home: React.FC = () => {
                                 padding: '2px 5px',
                                 borderRadius: '3px'
                               }}>
-                                {index + 1}/{selectedSignalement.photos.length}
+                                {/* {index + 1}/{selectedSignalement.photos.length} */}
                               </div>
                             </div>
                           </IonCol>

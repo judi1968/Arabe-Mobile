@@ -17,7 +17,7 @@
 
 .login-title h1 {
     margin: 0;
-    color: #333;
+    color: #fc5130;
     font-weight: 700;
 }
 
@@ -50,7 +50,7 @@
 .login-button {
     margin-top: 20px;
     --border-radius: 12px;
-    --background: linear-gradient(135deg, #4facfe, #00c6ff);
+    --background: linear-gradient(135deg, #fc5130, #ff6647);
     font-weight: 600;
 
 }
@@ -60,3 +60,9 @@
     font-size: 12px;
     color: #aaa;
 }
+
+/* 
+    color 1 : #fc5130 (tomate)
+    color 2 : #foeeee (gris)
+    
+*/

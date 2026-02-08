@@ -1,0 +1,23 @@
+
+.bg-tomato {
+    --background: #fc5130;
+    --color:white;
+}
+
+.bg-grey {
+    --background: #bebebe;
+}
+
+.color-tomato {
+    --color: #fc5130;
+    color: #fc5130;
+}
+
+.filtretoolbar{
+    display: flex;
+    flex-direction: column;
+    
+}
+.toolbar-content{
+    --display: block;
+}

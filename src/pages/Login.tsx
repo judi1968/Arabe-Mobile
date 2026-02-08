@@ -16,7 +16,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 
 import './assets/css/Login.css';
-import logo from  '../assets/images/logo.jpg'
+import logo from  '../assets/images/logo.png'
 const Login: React.FC = () => {
   const [email, setEmail] = useState('test@gmail.com');
   const [motDePasse, setMotDePasse] = useState('test1234');
