@@ -65,14 +65,20 @@ subprojects {
         }
     }
 
-    // --- 🔴 FIX CONFLIT KOTLIN ---
+    // --- 🔴 FIX CONFLIT KOTLIN ET COROUTINES ---
     configurations.all {
-        resolutionStrategy.eachDependency { details ->
-            if (details.requested.group == "org.jetbrains.kotlin") {
-                // Forcer Kotlin 1.8.22 partout
-                details.useVersion "1.8.22"
-                details.because("Évite le conflit kotlin-stdlib 1.6.x vs 1.8.x")
-            }
+        resolutionStrategy {
+            // Forcer les versions des coroutines compatibles avec Kotlin 1.8.22
+            force 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+            force 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+            force 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3'
+            
+            // Forcer les versions compatibles de Kotlin
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
         }
 
         // Exclure les anciens modules kotlin-stdlib-jdk7 / jdk8
