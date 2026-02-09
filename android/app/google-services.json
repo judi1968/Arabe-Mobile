@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "560164445602",
+    "project_id": "arabe-8144d",
+    "storage_bucket": "arabe-8144d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:560164445602:android:420ae91a09f712d61026fb",
+        "android_client_info": {
+          "package_name": "application.notif"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3tScTdKB72tpR2KKjCom6KqfESdTZRJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:560164445602:android:40e969fedcdf8e271026fb",
+        "android_client_info": {
+          "package_name": "io.ionic.starter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3tScTdKB72tpR2KKjCom6KqfESdTZRJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

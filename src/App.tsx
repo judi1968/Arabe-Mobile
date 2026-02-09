@@ -1,9 +1,11 @@
 import { Redirect, Route } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { useEffect } from 'react';
 
 import Login from './pages/Login';
 import AppLayout from './pages/AppLayout';
+import { initializePushNotifications } from './services/notificationService';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -27,25 +29,34 @@ L.Icon.Default.mergeOptions({
     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const App: React.FC = () => (
-  <IonApp>
-    <IonReactRouter>
-      <IonRouterOutlet>
+const App: React.FC = () => {
+  useEffect(() => {
+    // Initialiser les notifications push au démarrage
+    initializePushNotifications().catch((err) => {
+      console.error('Failed to initialize push notifications:', err);
+    });
+  }, []);
 
-        {/* Login */}
-        <Route exact path="/login" component={Login} />
+  return (
+    <IonApp>
+      <IonReactRouter>
+        <IonRouterOutlet>
 
-        {/* App avec menu */}
-        <Route path="/app" component={AppLayout} />
+          {/* Login */}
+          <Route exact path="/login" component={Login} />
 
-        {/* Redirection par défaut */}
-        <Route exact path="/">
-          <Redirect to="/login" />
-        </Route>
+          {/* App avec menu */}
+          <Route path="/app" component={AppLayout} />
 
-      </IonRouterOutlet>
-    </IonReactRouter>
-  </IonApp>
-);
+          {/* Redirection par défaut */}
+          <Route exact path="/">
+            <Redirect to="/login" />
+          </Route>
+
+        </IonRouterOutlet>
+      </IonReactRouter>
+    </IonApp>
+  );
+};
 
 export default App;
