@@ -997,12 +997,12 @@ const Home: React.FC = () => {
           <div className='filtretoolbar' >
             
             
-            <IonSegment className='bg-tomato' style={{ color: 'white'}} value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
-              <IonSegmentButton value="all" style={{ '--color-checked': '#fc5130' }}>
+            <IonSegment className='bg-tomato' style={{ color: 'white' , borderRadius:'25px'}} value={filterType} onIonChange={e => setFilterType(e.detail.value as 'all' | 'mine')}>
+              <IonSegmentButton value="all" style={{ color: 'white','--color-checked': '#10dc60' }}>
                 <IonIcon icon={peopleOutline} />
                 <IonLabel>Tous</IonLabel>
               </IonSegmentButton>
-              <IonSegmentButton value="mine" style={{ '--color-checked': '#10dc60' }}>
+              <IonSegmentButton value="mine" style={{ color: 'white','--color-checked': '#10dc60' }}>
                 <IonIcon icon={personOutline} />
                 <IonLabel>Mes signalements</IonLabel>
               </IonSegmentButton>
